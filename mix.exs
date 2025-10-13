@@ -32,6 +32,16 @@ defmodule Argos.MixProject do
 
   defp aliases do
     [
+      gen: [
+        "escript.build",
+        "deploy"
+      ],
+      deploy: fn _ ->
+        dest_dir = Path.expand("~/.Ypsilon")
+        File.mkdir_p!(dest_dir)
+        File.cp!("argos", Path.join(dest_dir, "argos"))
+        IO.puts("✅ Escript instalado en #{dest_dir}/argos")
+      end,
       credo: ["format --check-formatted", "credo --strict --format=oneline"],
       quality: [
         "deps.get",
@@ -80,51 +90,6 @@ defmodule Argos.MixProject do
   def escript do
     [
       main_module: Argos.CLI
-    ]
-  end
-
-  defp aliases do
-    [
-      gen: [
-        "escript.build",
-        "deploy"
-      ],
-      deploy: fn _ ->
-        dest_dir = Path.expand("~/.Ypsilon")
-        File.mkdir_p!(dest_dir)
-        File.cp!("argos", Path.join(dest_dir, "argos"))
-        IO.puts("✅ Escript instalado en #{dest_dir}/argos")
-      end,
-      credo: ["format --check-formatted", "credo --strict --format=oneline"],
-      quality: [
-        "deps.get",
-        "clean",
-        "compile --warnings-as-errors",
-        "cmd MIX_ENV=test mix test",
-        "credo --strict",
-        "dialyzer",
-        "cmd 'echo \\\"quality terminado\"'"
-      ],
-      ci: [
-        "deps.get",
-        "clean",
-        "compile --warnings-as-errors",
-        "cmd MIX_ENV=test mix test",
-        "credo --strict",
-        "cmd 'echo \\\"terminado terminado\"'"
-      ],
-      hex_prepare: [
-        "clean",
-        "compile --force --warnings-as-errors",
-        "format",
-        "test",
-        "docs",
-        "cmd mix hex.build"
-      ],
-      hex_publish: [
-        "hex_prepare",
-        "cmd mix hex.publish"
-      ]
     ]
   end
 

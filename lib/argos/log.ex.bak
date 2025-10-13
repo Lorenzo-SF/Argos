@@ -134,34 +134,4 @@ defmodule Argos.Log do
     status = if success?, do: "SUCCESS", else: "FAILED"
     Logger.info("Task executed: #{task_name} (Status: #{status}, Duration: #{duration}ms, Result: #{inspect(result) |> clean_ansi()})")
   end
-
-  # ---------------- TUI Mode Detection ------------------
-  defp in_tui_mode? do
-    # Verificar si hay un proceso del TUI activo
-    Process.whereis(:aegis_tui) != nil or
-    Enum.any?(Process.registered(), fn name -> 
-      Atom.to_string(name) |> String.starts_with?("Aegis.Tui")
-    end)
-  end
-
-  # ---------------- Log Storage for TUI Mode ------------------
-  defp store_log_messages(level, lines, ts, md) do
-    # Añadir logs a una cola o archivo temporal
-    # En modo TUI, los logs se mostrarán en una sección específica de la UI
-    log_entries = Enum.map(lines, fn line ->
-      "#{format_timestamp(ts)} #{level_icon(level)} [#{inspect(level)}] #{line}
-"
-    end)
-
-    # Escribir logs a un archivo temporal para que la UI pueda leerlos
-    log_dir = Path.join(System.tmp_dir!(), "aegis_logs")
-    File.mkdir_p!(log_dir)
-    
-    log_file = Path.join(log_dir, "tui_logs.txt")
-    
-    Enum.each(log_entries, fn entry ->
-      File.write(log_file, entry, [:append])
-    end)
-  end
-
 end

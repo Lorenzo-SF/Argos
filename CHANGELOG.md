@@ -106,5 +106,29 @@ Primera versión alpha de Argos como parte del refactor de Proyecto Ypsilon.
 - Estructuras de datos para resultados
 - Funciones de logging básicas
 
+## Versión 1.0.3 (2025-09-26)
+
+### 🔧 Refactoring
+
+- Refactor y fix de Command. Actualizacion de documentación
+
+## Versión 1.0.2 (2025-09-25)
+
+### 🔧 Refactoring
+
+- Refactor nombres de funciones de "Log"
+
+## Versión 1.0.1 (2025-09-24)
+
+### 
+
+- Refactor de "AsyncTask" porque en algunas ocasiones da problemas de compilacion
+
+## Versión 1.0.0 (2025-09-24)
+
+### 
+
+- Publicacion libreria
+
 [Unreleased]: https://github.com/usuario/argos/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/usuario/argos/releases/tag/v1.0.0
