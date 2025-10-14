@@ -1,0 +1,11 @@
+[
+  ~r/lib\/argos\.ex:92.*invalid_contract/,
+  ~r/lib\/argos\.ex:230.*no_return/,
+  ~r/lib\/argos\.ex:93.*no_return/,
+  ~r/lib\/argos\.ex:94.*call/,
+  ~r/lib\/argos\/command\.ex:1.*pattern_match/,
+  ~r/lib\/argos\/command\.ex:156.*guard_fail/,
+  ~r/lib\/argos\/command\.ex:135.*no_return/,
+  ~r/lib\/argos\/command\.ex:285.*pattern_match/,
+  ~r/lib\/argos\/command\.ex:286.*pattern_match/
+]
