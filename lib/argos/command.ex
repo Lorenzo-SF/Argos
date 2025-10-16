@@ -56,7 +56,17 @@ defmodule Argos.Command do
 
   # ---------------- Exec (maintaining original behavior for backward compatibility) ----------------
   def __exec__(:raw, command, opts, _caller) do
-    System.cmd(@shell, ["-c", command], opts)
+    case command do
+      cmd_list when is_list(cmd_list) and length(cmd_list) > 0 ->
+        [cmd_head | cmd_tail] = cmd_list
+        System.cmd(cmd_head, cmd_tail, opts)
+      
+      cmd_string when is_binary(cmd_string) ->
+        System.cmd(@shell, ["-c", cmd_string], opts)
+      
+      _ ->
+        System.cmd(@shell, ["-c", to_string(command)], opts)
+    end
   end
 
   def __exec__(:normal, command, opts, caller) do
