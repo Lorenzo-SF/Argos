@@ -27,6 +27,15 @@ defmodule Argos.Command do
     end
   end
 
+  defmacro exec_silent!(command, opts \\ []) do
+    caller = Macro.escape(__CALLER__)
+
+    quote bind_quoted: [command: command, opts: opts, caller: caller] do
+      opts = Keyword.put_new(opts, :stderr_to_stdout, true)
+      Argos.Command.__exec__(:silent, command, opts, caller)
+    end
+  end
+
   defmacro exec_interactive!(command, opts \\ []) do
     caller = Macro.escape(__CALLER__)
 
@@ -44,9 +53,20 @@ defmodule Argos.Command do
       Argos.Command.__exec__(:sudo, command, opts, caller)
     end
   end
+
   # ---------------- Exec (maintaining original behavior for backward compatibility) ----------------
   def __exec__(:raw, command, opts, _caller) do
-    System.cmd(@shell, ["-c", command], opts)
+    case command do
+      cmd_list when is_list(cmd_list) and length(cmd_list) > 0 ->
+        [cmd_head | cmd_tail] = cmd_list
+        System.cmd(cmd_head, cmd_tail, opts)
+
+      cmd_string when is_binary(cmd_string) ->
+        System.cmd(@shell, ["-c", cmd_string], opts)
+
+      _ ->
+        System.cmd(@shell, ["-c", to_string(command)], opts)
+    end
   end
 
   def __exec__(:normal, command, opts, caller) do
@@ -67,13 +87,14 @@ defmodule Argos.Command do
       error: nil
     }
 
-    # Log the result using the struct data
     __log_result__(command, output, exit_code, caller)
-
-    # Handle halt if needed
     __handle_halt__(result, halt?)
 
     result
+  end
+
+  def __exec__(:silent, command, opts, caller) do
+    __exec__(:normal, "#{command} /dev/null 2>&1", opts, caller) |> elem(1)
   end
 
   def __exec__(:interactive, command, opts, caller) do
@@ -105,9 +126,9 @@ defmodule Argos.Command do
             {:args, args}
           ])
 
-          command
-          |> __collect_output__(port, "", caller, start_time)
-          |> __handle_halt__(halt?)
+        command
+        |> __collect_output__(port, "", caller, start_time)
+        |> __handle_halt__(halt?)
     end
   end
 
@@ -120,29 +141,9 @@ defmodule Argos.Command do
     Logger.warning("SUDO command execution attempted: #{command}")
 
     executable = System.find_executable("sudo")
-    
-    if executable do
-      args =
-        if interactive? do
-          # Modo interactivo: abrir pseudo-terminal con 'script' si existe
-          case System.find_executable("script") do
-            nil ->
-              ["-A", @shell, "-c", command]
 
-            script_path ->
-              [
-                "-A",
-                script_path,
-                "-q",
-                "/dev/null",
-                @shell,
-                "-c",
-                command
-              ]
-          end
-        else
-          ["-A", @shell, "-c", command]
-        end
+    if executable do
+      args = get_interactive_args(command, interactive?)
 
       port =
         Port.open({:spawn_executable, executable}, [
@@ -154,12 +155,12 @@ defmodule Argos.Command do
           {:env, [{"SUDO_ASKPASS", "/usr/bin/ssh-askpass"}]}
         ])
 
-      result = __collect_output__(command, port, "", caller, start_time)
-      __handle_halt__(result, halt?)
+      command
+      |> __collect_output__(port, "", caller, start_time)
+      |> __handle_halt__(halt?)
     else
-      # Si no se encuentra sudo, devolver un CommandResult de error
       duration = System.monotonic_time(:millisecond) - start_time
-      
+
       %CommandResult{
         command: command,
         args: [],
@@ -172,13 +173,33 @@ defmodule Argos.Command do
     end
   end
 
-  def halt(code) do
+  defp get_interactive_args(command, false), do: ["-A", @shell, "-c", command]
+
+  defp get_interactive_args(command, true) do
+    case System.find_executable("script") do
+      nil ->
+        ["-A", @shell, "-c", command]
+
+      script_path ->
+        [
+          "-A",
+          script_path,
+          "-q",
+          "/dev/null",
+          @shell,
+          "-c",
+          command
+        ]
+    end
+  end
+
+  @spec halt(integer) :: no_return
+  def halt(code \\ 0) do
     System.halt(code)
   end
 
-  def halt(), do: System.halt(0)
-
-  def __handle_halt__(%CommandResult{exit_code: code, output: msg}, true) when code not in [0, 1] do
+  def __handle_halt__(%CommandResult{exit_code: code, output: msg}, true)
+      when code not in [0, 1] do
     Logger.error("Error ejecutando comando: #{String.trim(msg)} (code #{code})")
     halt()
   end
@@ -186,7 +207,7 @@ defmodule Argos.Command do
   def __handle_halt__(result, _), do: result
 
   defp __collect_output__(command, port, acc, caller, start_time) do
-    actual_start_time = 
+    actual_start_time =
       case start_time do
         nil -> System.monotonic_time(:millisecond)
         time -> time
@@ -284,7 +305,7 @@ defmodule Argos.Command do
   # ---------------- Utils ----------------
   def kill_process(process_name) when is_binary(process_name) do
     if String.length(process_name) > 0 and
-        String.match?(process_name, ~r/^[a-zA-Z0-9_.-]+$/) do
+         String.match?(process_name, ~r/^[a-zA-Z0-9_.-]+$/) do
       exec!("pgrep -f #{process_name} | head -10 | xargs kill -TERM")
     else
       Logger.error("Invalid process name: #{process_name}")

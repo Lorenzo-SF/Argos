@@ -16,7 +16,8 @@ defmodule Argos.AsyncTask do
   # =========================
   # API LEGACY (compatibilidad)
   # =========================
-  def start(name, fun, opts \\ []) when is_atom(name) and (is_function(fun, 0) or is_function(fun, 1)) do
+  def start(name, fun, opts \\ [])
+      when is_atom(name) and (is_function(fun, 0) or is_function(fun, 1)) do
     stop(name)
 
     task =
@@ -51,20 +52,16 @@ defmodule Argos.AsyncTask do
     Task.async(fn -> loop_poll(fun, interval) end)
   end
 
-  def create_task(fun, _list, interval: interval) when is_function(fun, 0) do
-    Task.async(fn -> loop_poll_0(fun, interval) end)
-  end
-
-  defp loop_poll(fun, interval) when is_function(fun, 1) do
+  defp loop_poll(fun, interval) when is_integer(interval) and interval > 0 do
     Process.sleep(interval)
-    fun.(nil)
+
+    cond do
+      is_function(fun, 1) -> fun.(nil)
+      is_function(fun, 0) -> fun.()
+      true -> raise ArgumentError, "loop_poll/2: fun debe ser función de aridad 0 o 1"
+    end
+
     loop_poll(fun, interval)
-  end
-
-  defp loop_poll_0(fun, interval) when is_function(fun, 0) do
-    Process.sleep(interval)
-    fun.()
-    loop_poll_0(fun, interval)
   end
 
   def stop(name) when is_atom(name) do

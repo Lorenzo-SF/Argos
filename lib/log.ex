@@ -19,7 +19,7 @@ defmodule Argos.Log do
       try do
         formatted_msg = msg |> format_message()
         formatted_lines = String.split(formatted_msg, "\n", trim: true)
-        
+
         # Verificar si estamos en modo TUI (buscando si hay un proceso TUI corriendo)
         if in_tui_mode?() do
           # En modo TUI, almacenar logs para mostrarlos de forma no intrusiva
@@ -29,11 +29,11 @@ defmodule Argos.Log do
           Enum.each(formatted_lines, &IO.puts(pretty_line(&1, level, ts, md)))
         end
       rescue
-        e -> 
-          if not in_tui_mode?() do
-            IO.puts("[Argos.Log Error] #{inspect(e)}")
-          else
+        e ->
+          if in_tui_mode?() do
             store_log_messages(:error, ["[Argos.Log Error] #{inspect(e)}"], ts, md)
+          else
+            IO.puts("[Argos.Log Error] #{inspect(e)}")
           end
       end
     end
@@ -105,6 +105,7 @@ defmodule Argos.Log do
   defp format_timestamp({{y, mo, d}, {h, m, s, ms}}) do
     "#{pad2(y)}-#{pad2(mo)}-#{pad2(d)} #{pad2(h)}:#{pad2(m)}:#{pad2(s)}.#{pad3(ms)}"
   end
+
   defp format_timestamp(_), do: "unknown_time"
 
   defp pad2(n) when n < 10, do: "0#{n}"
@@ -127,41 +128,46 @@ defmodule Argos.Log do
   end
 
   def log_command_execution(command, exit_code, duration, output) do
-    Logger.info("Command executed: #{command} (Exit code: #{exit_code}, Duration: #{duration}ms, Output: #{inspect(output) |> clean_ansi()})")
+    Logger.info(
+      "Command executed: #{command} (Exit code: #{exit_code}, Duration: #{duration}ms, Output: #{inspect(output) |> clean_ansi()})"
+    )
   end
 
   def log_task_execution(task_name, success?, duration, result) do
     status = if success?, do: "SUCCESS", else: "FAILED"
-    Logger.info("Task executed: #{task_name} (Status: #{status}, Duration: #{duration}ms, Result: #{inspect(result) |> clean_ansi()})")
+
+    Logger.info(
+      "Task executed: #{task_name} (Status: #{status}, Duration: #{duration}ms, Result: #{inspect(result) |> clean_ansi()})"
+    )
   end
 
   # ---------------- TUI Mode Detection ------------------
   defp in_tui_mode? do
     # Verificar si hay un proceso del TUI activo
     Process.whereis(:aegis_tui) != nil or
-    Enum.any?(Process.registered(), fn name -> 
-      Atom.to_string(name) |> String.starts_with?("Aegis.Tui")
-    end)
+      Enum.any?(Process.registered(), fn name ->
+        Atom.to_string(name) |> String.starts_with?("Aegis.Tui")
+      end)
   end
 
   # ---------------- Log Storage for TUI Mode ------------------
-  defp store_log_messages(level, lines, ts, md) do
+  defp store_log_messages(level, lines, ts, _md) do
     # Añadir logs a una cola o archivo temporal
     # En modo TUI, los logs se mostrarán en una sección específica de la UI
-    log_entries = Enum.map(lines, fn line ->
-      "#{format_timestamp(ts)} #{level_icon(level)} [#{inspect(level)}] #{line}
+    log_entries =
+      Enum.map(lines, fn line ->
+        "#{format_timestamp(ts)} #{level_icon(level)} [#{inspect(level)}] #{line}
 "
-    end)
+      end)
 
     # Escribir logs a un archivo temporal para que la UI pueda leerlos
     log_dir = Path.join(System.tmp_dir!(), "aegis_logs")
     File.mkdir_p!(log_dir)
-    
+
     log_file = Path.join(log_dir, "tui_logs.txt")
-    
+
     Enum.each(log_entries, fn entry ->
       File.write(log_file, entry, [:append])
     end)
   end
-
 end

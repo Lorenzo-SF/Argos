@@ -45,12 +45,15 @@ defmodule Argos.MixProject do
       credo: ["format --check-formatted", "credo --strict --format=oneline"],
       quality: [
         "deps.get",
-        "clean",
+        "credo",
         "compile --warnings-as-errors",
+        "cmd 'echo \"✅ mix compile terminado\"'",
         "cmd MIX_ENV=test mix test",
+        "cmd 'echo \"✅ mix test terminado\"'",
         "credo --strict",
+        "cmd 'echo \"✅ mix credo terminado\"'",
         "dialyzer",
-        "cmd 'echo \\\"quality terminado\"'"
+        "cmd 'echo \"✅ quality terminado\"'"
       ],
       ci: [
         "deps.get",
