@@ -1,138 +1,56 @@
 defmodule Argos.Command do
   @moduledoc """
-  Sistema de ejecución de comandos shell con soporte para diferentes modos.
-
-  Proporciona macros y funciones para ejecutar comandos del sistema con control
-  granular sobre la salida, el modo de ejecución y el manejo de errores.
-
-  ## Características
-
-  - Múltiples modos de ejecución (normal, silencioso, interactivo, sudo)
-  - Resultados estructurados con duración y códigos de salida
-  - Logging automático de comandos ejecutados
-  - Soporte para timeouts configurables
-  - Manejo de procesos y señales
-  - Ejecución segura de comandos con validación
-
-  ## Modos de Ejecución
-
-  ### Normal (`exec!/2`)
-  Ejecuta un comando y devuelve un struct CommandResult con toda la información.
-
-      result = exec!("ls -la")
-      if result.success? do
-        IO.puts("Salida: #{result.output}")
-      end
-
-  ### Raw (`exec_raw!/2`)
-  Ejecuta un comando y devuelve una tupla {output, exit_code} sin logging.
-
-      {output, code} = exec_raw!("git status")
-
-  ### Silencioso (`exec_silent!/2`)
-  Ejecuta un comando redirigiendo toda la salida a /dev/null.
-
-      code = exec_silent!("some_quiet_command")
-
-  ### Interactivo (`exec_interactive!/2`)
-  Ejecuta un comando permitiendo interacción en tiempo real.
-
-      result = exec_interactive!("vim archivo.txt")
-
-  ### Sudo (`exec_sudo!/2`)
-  Ejecuta un comando con privilegios de superusuario.
-
-      result = exec_sudo!("systemctl restart nginx")
-
-  ## Opciones Comunes
-
-  - `:timeout` - Timeout en milisegundos (default: 30_000)
-  - `:stderr_to_stdout` - Redirige stderr a stdout (default: true)
-  - `:halt` - Termina el programa si el comando falla (default: false)
-  - `:interactive` - Modo interactivo para sudo (default: false)
-
-  ## Gestión de Procesos
-
-      # Matar procesos por nombre
-      Argos.Command.kill_process("my_app")
-
-      # Matar múltiples procesos
-      results = Argos.Command.kill_processes_by_name(["app1", "app2"])
-
-  ## Configuración
-
-  El shell usado por defecto se configura en config.exs:
-
-      config :argos, shell: "/bin/zsh"
-
-  ## Struct CommandResult
-
-  Todos los comandos (excepto raw) devuelven un %CommandResult{}:
-
-  - `command` - Comando ejecutado
-  - `args` - Argumentos del comando
-  - `output` - Salida capturada
-  - `exit_code` - Código de salida
-  - `duration` - Duración en milisegundos
-  - `success?` - true si exit_code == 0
-  - `error` - Mensaje de error si lo hay
+  Sistema de ejecución de comandos shell - Versión sin macros.
   """
-
-  require Logger
 
   alias Argos.Structs.CommandResult
 
   @shell_timeout 30_000
   @shell Application.compile_env(:argos, :shell, "/bin/zsh")
 
-  # ---------------- Macros (maintaining backward compatibility) ----------------
-  defmacro exec_raw!(command, opts \\ []) do
-    caller = Macro.escape(__CALLER__)
-
-    quote bind_quoted: [command: command, opts: opts, caller: caller] do
-      opts = Keyword.put_new(opts, :stderr_to_stdout, true)
-      Argos.Command.__exec__(:raw, command, opts, caller)
-    end
+  # ---------------- API PÚBLICA SIMPLIFICADA ----------------
+  @doc """
+  Ejecuta un comando y devuelve un CommandResult estructurado.
+  """
+  def exec(command, opts \\ []) do
+    opts = Keyword.put_new(opts, :stderr_to_stdout, true)
+    __exec__(:normal, command, opts)
   end
 
-  defmacro exec!(command, opts \\ []) do
-    caller = Macro.escape(__CALLER__)
-
-    quote bind_quoted: [command: command, opts: opts, caller: caller] do
-      opts = Keyword.put_new(opts, :stderr_to_stdout, true)
-      Argos.Command.__exec__(:normal, command, opts, caller)
-    end
+  @doc """
+  Ejecuta un comando y devuelve una tupla {output, exit_code} sin logging.
+  """
+  def exec_raw(command, opts \\ []) do
+    opts = Keyword.put_new(opts, :stderr_to_stdout, true)
+    __exec__(:raw, command, opts)
   end
 
-  defmacro exec_silent!(command, opts \\ []) do
-    caller = Macro.escape(__CALLER__)
-
-    quote bind_quoted: [command: command, opts: opts, caller: caller] do
-      opts = Keyword.put_new(opts, :stderr_to_stdout, true)
-      Argos.Command.__exec__(:silent, command, opts, caller)
-    end
+  @doc """
+  Ejecuta un comando redirigiendo salida a /dev/null.
+  """
+  def exec_silent(command, opts \\ []) do
+    opts = Keyword.put_new(opts, :stderr_to_stdout, true)
+    __exec__(:silent, command, opts)
   end
 
-  defmacro exec_interactive!(command, opts \\ []) do
-    caller = Macro.escape(__CALLER__)
-
-    quote bind_quoted: [command: command, opts: opts, caller: caller] do
-      opts = Keyword.put_new(opts, :interactive, true)
-      Argos.Command.__exec__(:interactive, command, opts, caller)
-    end
+  @doc """
+  Ejecuta un comando en modo interactivo.
+  """
+  def exec_interactive(command, opts \\ []) do
+    opts = Keyword.put_new(opts, :interactive, true)
+    __exec__(:interactive, command, opts)
   end
 
-  defmacro exec_sudo!(command, opts \\ []) do
-    caller = Macro.escape(__CALLER__)
-
-    quote bind_quoted: [command: command, opts: opts, caller: caller] do
-      opts = Keyword.put_new(opts, :stderr_to_stdout, true)
-      Argos.Command.__exec__(:sudo, command, opts, caller)
-    end
+  @doc """
+  Ejecuta un comando con privilegios de superusuario.
+  """
+  def exec_sudo(command, opts \\ []) do
+    opts = Keyword.put_new(opts, :stderr_to_stdout, true)
+    __exec__(:sudo, command, opts)
   end
 
-  # ---------------- Exec (maintaining original behavior for backward compatibility) ----------------
-  def __exec__(:raw, command, opts, _caller) do
+  # ---------------- IMPLEMENTACIÓN INTERNA ----------------
+  def __exec__(:raw, command, opts) do
     case command do
       cmd_list when is_list(cmd_list) and length(cmd_list) > 0 ->
         [cmd_head | cmd_tail] = cmd_list
@@ -146,12 +64,11 @@ defmodule Argos.Command do
     end
   end
 
-  def __exec__(:normal, command, opts, caller) do
+  def __exec__(:normal, command, opts) do
     {halt?, opts} = Keyword.pop(opts, :halt, false)
     start_time = System.monotonic_time(:millisecond)
 
-    {output, exit_code} = __exec__(:raw, command, opts, caller)
-
+    {output, exit_code} = __exec__(:raw, command, opts)
     duration = System.monotonic_time(:millisecond) - start_time
 
     result = %CommandResult{
@@ -164,17 +81,19 @@ defmodule Argos.Command do
       error: nil
     }
 
-    __log_result__(command, output, exit_code, caller)
-    __handle_halt__(result, halt?)
+    # Log automático con metadata del caller
+    __log_result__(command, result, get_caller_metadata())
 
+    __handle_halt__(result, halt?)
     result
   end
 
-  def __exec__(:silent, command, opts, caller) do
-    __exec__(:normal, "#{command} /dev/null 2>&1", opts, caller) |> elem(1)
+  def __exec__(:silent, command, opts) do
+    result = __exec__(:normal, "#{command} > /dev/null 2>&1", opts)
+    result.exit_code
   end
 
-  def __exec__(:interactive, command, opts, caller) do
+  def __exec__(:interactive, command, opts) do
     halt? = Keyword.get(opts, :halt, false)
     start_time = System.monotonic_time(:millisecond)
 
@@ -188,7 +107,7 @@ defmodule Argos.Command do
             :stderr_to_stdout
           ])
 
-        result = __collect_output__(command, port, "", caller, start_time)
+        result = __collect_output__(command, port, "", start_time)
         __handle_halt__(result, halt?)
 
       script_path ->
@@ -204,18 +123,17 @@ defmodule Argos.Command do
           ])
 
         command
-        |> __collect_output__(port, "", caller, start_time)
+        |> __collect_output__(port, "", start_time)
         |> __handle_halt__(halt?)
     end
   end
 
-  def __exec__(:sudo, command, opts, caller) do
-    # Si el comando requiere interacción, tratamos sudo como :interactive
+  def __exec__(:sudo, command, opts) do
     interactive? = Keyword.get(opts, :interactive, false)
     halt? = Keyword.get(opts, :halt, false)
     start_time = System.monotonic_time(:millisecond)
 
-    Logger.warning("SUDO command execution attempted: #{command}")
+    Argos.log(:warning, "SUDO command execution attempted", command: command)
 
     executable = System.find_executable("sudo")
 
@@ -233,7 +151,7 @@ defmodule Argos.Command do
         ])
 
       command
-      |> __collect_output__(port, "", caller, start_time)
+      |> __collect_output__(port, "", start_time)
       |> __handle_halt__(halt?)
     else
       duration = System.monotonic_time(:millisecond) - start_time
@@ -250,6 +168,67 @@ defmodule Argos.Command do
     end
   end
 
+  # ---------------- HELPER: CAPTURAR METADATA DEL CALLER ----------------
+  defp get_caller_metadata do
+    case Process.info(self(), :current_stacktrace) do
+      {:current_stacktrace, stacktrace} ->
+        # Buscar el primer frame que no sea de Argos.Command
+        caller_frame =
+          Enum.find(stacktrace, fn
+            {Argos.Command, _, _, _} -> false
+            {_, _, _, _} -> true
+            _ -> false
+          end) || List.first(stacktrace)
+
+        case caller_frame do
+          {module, function, arity, [file: file, line: line]} ->
+            %{
+              module: module,
+              function: "#{function}/#{arity}",
+              file: file,
+              line: line
+            }
+
+          {module, function, arity, _} ->
+            %{
+              module: module,
+              function: "#{function}/#{arity}",
+              file: "unknown",
+              line: 0
+            }
+
+          _ ->
+            %{module: "unknown", function: "unknown/0", file: "unknown", line: 0}
+        end
+
+      _ ->
+        %{module: "unknown", function: "unknown/0", file: "unknown", line: 0}
+    end
+  end
+
+  # ---------------- HELPER: LOGGING MEJORADO ----------------
+  defp __log_result__(command, %CommandResult{} = result, caller_metadata) do
+    # Usar la nueva API de logging de Argos
+    metadata =
+      [
+        command: command,
+        exit_code: result.exit_code,
+        duration: result.duration,
+        success?: result.success?,
+        output_length: String.length(result.output || "")
+      ] ++ Map.to_list(caller_metadata)
+
+    if result.success? do
+      Argos.log(:info, "Command executed: #{command}", metadata)
+    else
+      Argos.log(:error, "Command failed: #{command}", metadata)
+    end
+
+    # También loguear el resultado estructurado
+    Argos.log_command(result)
+  end
+
+  # ---------------- MANTENER FUNCIONES EXISTENTES (modificadas) ----------------
   defp get_interactive_args(command, false), do: ["-A", @shell, "-c", command]
 
   defp get_interactive_args(command, true) do
@@ -270,31 +249,40 @@ defmodule Argos.Command do
     end
   end
 
-  @spec halt(integer) :: no_return
+  @doc """
+  Detiene el sistema con el código de salida especificado.
+
+  Esta función no retorna - termina la VM de Erlang.
+  """
+  @dialyzer {:no_return, halt: 0}
+  @dialyzer {:no_return, halt: 1}
   def halt(code \\ 0) do
     System.halt(code)
   end
 
   def __handle_halt__(%CommandResult{exit_code: code, output: msg}, true)
       when code not in [0, 1] do
-    Logger.error("Error ejecutando comando: #{String.trim(msg)} (code #{code})")
+    Argos.log(:error, "Command failed, halting system",
+      exit_code: code,
+      output: String.trim(msg || "")
+    )
+
     halt()
   end
 
   def __handle_halt__(result, _), do: result
 
-  defp __collect_output__(command, port, acc, caller, start_time) when is_integer(start_time) do
+  defp __collect_output__(command, port, acc, start_time) when is_integer(start_time) do
     actual_start_time = start_time
 
     receive do
       {^port, {:data, data}} ->
-        __collect_output__(command, port, acc <> data, caller, actual_start_time)
+        __collect_output__(command, port, acc <> data, actual_start_time)
 
       {^port, {:exit_status, code}} ->
         duration = System.monotonic_time(:millisecond) - actual_start_time
-        __log_result__(command, acc, code, caller)
 
-        %CommandResult{
+        result = %CommandResult{
           command: command,
           args: [],
           output: acc,
@@ -303,50 +291,29 @@ defmodule Argos.Command do
           success?: code == 0,
           error: nil
         }
+
+        __log_result__(command, result, get_caller_metadata())
+        result
     after
       @shell_timeout ->
         if is_port(port), do: Port.close(port)
-        Logger.error("EXEC TIMEOUT -> #{String.trim(acc)}")
-        __log_result__(command, acc, 1, caller)
-        duration = System.monotonic_time(:millisecond) - actual_start_time
 
-        %CommandResult{
+        result = %CommandResult{
           command: command,
           args: [],
           output: acc,
           exit_code: 1,
-          duration: duration,
+          duration: System.monotonic_time(:millisecond) - actual_start_time,
           success?: false,
           error: "Timeout after #{@shell_timeout}ms"
         }
+
+        __log_result__(command, result, get_caller_metadata())
+        result
     end
   end
 
-  defp __log_result__(command, message, code, caller) do
-    log_command = command |> String.split(" ") |> Enum.take(2) |> Enum.join(" ")
-
-    log =
-      "Module: #{caller.module}\\nFunction #{inspect(caller.function)} -> (#{code})\\nMessage: #{String.trim(message)}"
-
-    case code do
-      -1 ->
-        Logger.info(log_command)
-        Logger.debug(log)
-
-      1 ->
-        Logger.info(command)
-        Logger.warning(log)
-
-      c when c > 1 ->
-        Logger.error(command)
-        Logger.critical(log)
-
-      _ ->
-        :ok
-    end
-  end
-
-  # ---------------- Process Response ----------------
+  # ---------------- MANTENER FUNCIONES DE PROCESOS ----------------
   def process_response(code, opts \\ []) do
     message =
       code
@@ -375,14 +342,13 @@ defmodule Argos.Command do
   defp get_message_type(1), do: :warning
   defp get_message_type(_), do: :error
 
-  # ---------------- Utils ----------------
+  # ---------------- FUNCIONES DE KILL CORREGIDAS ----------------
   def kill_process(process_name) when is_binary(process_name) do
     if String.length(process_name) > 0 and
          String.match?(process_name, ~r/^[a-zA-Z0-9_.-]+$/) do
-      exec!("pgrep -f #{process_name} | head -10 | xargs kill -TERM")
+      # Usar exec en lugar de exec_raw para evitar problemas
+      exec("pgrep -f #{process_name} | head -10 | xargs kill -TERM")
     else
-      Logger.error("Invalid process name: #{process_name}")
-
       %CommandResult{
         command: "kill",
         args: [process_name],
@@ -406,11 +372,8 @@ defmodule Argos.Command do
     )
   end
 
-  @doc """
-  Funciones auxiliares para el manejo robusto de procesos.
-  """
   def kill_processes_by_name(process_names) when is_list(process_names) do
-    Logger.info("Matando procesos: #{inspect(process_names)}")
+    Argos.log(:info, "Killing processes", process_names: process_names)
 
     Enum.map(process_names, fn process_name ->
       case kill_process_robust(process_name) do
@@ -433,7 +396,12 @@ defmodule Argos.Command do
         :not_found
 
       {:kill_term, %CommandResult{output: error, exit_code: code}} ->
-        Logger.error("Error matando proceso #{process_name}: #{error} (#{code})")
+        Argos.log(:error, "Error killing process",
+          process_name: process_name,
+          error: error,
+          exit_code: code
+        )
+
         {:error, :kill_term_command_failed}
 
       {:pkill, %CommandResult{exit_code: exit_code}} when exit_code != 0 ->
@@ -442,21 +410,48 @@ defmodule Argos.Command do
   end
 
   defp do_kill_term(process_name) do
-    result = exec_raw!("pkill -TERM #{process_name}", timeout: 5000)
-    {:kill_term, result}
+    # Usar System.cmd directamente sin opciones problemáticas
+    {output, exit_code} = System.cmd("pkill", ["-TERM", process_name])
+
+    {:kill_term,
+     %CommandResult{
+       command: "pkill",
+       args: ["-TERM", process_name],
+       output: output,
+       exit_code: exit_code,
+       duration: 0,
+       success?: exit_code == 0
+     }}
   end
 
   defp do_pgrep(process_name) do
     Process.sleep(2000)
+    {output, exit_code} = System.cmd("pgrep", [process_name])
 
-    result = exec_raw!("pgrep #{process_name}", timeout: 2000)
-    {:pgrep, result}
+    {:pgrep,
+     %CommandResult{
+       command: "pgrep",
+       args: [process_name],
+       output: output,
+       exit_code: exit_code,
+       duration: 0,
+       success?: exit_code == 0
+     }}
   end
 
   defp do_pkill(_process_name, 1), do: {:pkill, %CommandResult{exit_code: 0}}
 
   defp do_pkill(process_name, 0) do
-    result = exec_raw!("pkill -KILL #{process_name}", timeout: 5000)
-    {:pkill, result}
+    {output, exit_code} = System.cmd("pkill", ["-KILL", process_name])
+
+    {:pkill,
+     %CommandResult{
+       command: "pkill",
+       args: ["-KILL", process_name],
+       output: output,
+       exit_code: exit_code,
+       duration: 0,
+       success?: exit_code == 0
+     }}
   end
 end

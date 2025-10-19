@@ -5,6 +5,7 @@
   ~r/lib\/argos\.ex:94.*call/,
   ~r/lib\/command\.ex:1.*pattern_match/,
   ~r/lib\/command\.ex:197.*no_return/,
+  ~r/lib\/command\.ex:273.*no_return/,
   ~r/lib\/argos\/command\.ex:1.*pattern_match/,
   ~r/lib\/argos\/command\.ex:156.*guard_fail/,
   ~r/lib\/argos\/command\.ex:135.*no_return/,
