@@ -79,7 +79,7 @@ defmodule Argos.Structs.TaskResult do
 
       iex> try do
       ...>   raise "Something went wrong"
-      ...> catch
+      ...> rescue
       ...>   exception ->
       ...>     Argos.Structs.TaskResult.from_exception("risky_task", exception, 800)
       ...> end

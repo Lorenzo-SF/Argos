@@ -2,9 +2,45 @@ defmodule Argos.AsyncTask do
   @moduledoc """
   Sistema de ejecución de tareas asíncronas sin dependencias de UI.
 
-  Proporciona funcionalidad para ejecutar tareas en paralelo y gestionar
-  su ejecución de forma estructurada, devolviendo resultados estructurados
-  en lugar de manejar la presentación visual.
+  Proporciona funcionalidad para ejecutar tareas en paralelo con control de
+  concurrencia y timeouts. Devuelve resultados estructurados en lugar de
+  manejar la presentación visual.
+
+  ## Características
+
+  - Ejecución paralela de comandos shell y funciones Elixir
+  - Control de concurrencia máxima
+  - Gestión de timeouts globales y por tarea
+  - Resultados estructurados con duración y estado de éxito
+  - API legacy para compatibilidad con polling periódico
+
+  ## Uso Básico
+
+      # Ejecutar comandos en paralelo
+      tasks = [
+        {"compile", "mix compile"},
+        {"test", "mix test"},
+        {"format", "mix format --check-formatted"}
+      ]
+
+      result = Argos.AsyncTask.run_parallel(tasks, max_concurrency: 2)
+      IO.inspect(result.all_success?)  # true si todas pasaron
+
+      # Combinar comandos y funciones
+      tasks = [
+        {"git_status", "git status --porcelain"},
+        {"custom_check", fn -> my_validation() end}
+      ]
+
+      result = Argos.AsyncTask.run_parallel(tasks, timeout: 60_000)
+
+  ## Resultado
+
+  `run_parallel/2` devuelve un mapa con:
+
+  - `results` - Lista de structs TaskResult
+  - `total_duration` - Duración total en milisegundos
+  - `all_success?` - true si todas las tareas fueron exitosas
   """
   require Logger
 
@@ -52,15 +88,10 @@ defmodule Argos.AsyncTask do
     Task.async(fn -> loop_poll(fun, interval) end)
   end
 
-  defp loop_poll(fun, interval) when is_integer(interval) and interval > 0 do
+  defp loop_poll(fun, interval)
+       when is_integer(interval) and interval > 0 and is_function(fun, 1) do
     Process.sleep(interval)
-
-    cond do
-      is_function(fun, 1) -> fun.(nil)
-      is_function(fun, 0) -> fun.()
-      true -> raise ArgumentError, "loop_poll/2: fun debe ser función de aridad 0 o 1"
-    end
-
+    fun.(nil)
     loop_poll(fun, interval)
   end
 

@@ -19,8 +19,7 @@ defmodule Argos.MixProject do
         extras: ["README.md", "CHANGELOG.md", "LICENSE"],
         source_ref: "v1.0.0",
         source_url: "https://github.com/lorenzo-sf/argos"
-      ],
-      escript: [main_module: Argos.CLI]
+      ]
     ]
   end
 
@@ -32,16 +31,6 @@ defmodule Argos.MixProject do
 
   defp aliases do
     [
-      gen: [
-        "escript.build",
-        "deploy"
-      ],
-      deploy: fn _ ->
-        dest_dir = Path.expand("~/.Ypsilon")
-        File.mkdir_p!(dest_dir)
-        File.cp!("argos", Path.join(dest_dir, "argos"))
-        IO.puts("✅ Escript instalado en #{dest_dir}/argos")
-      end,
       credo: ["format --check-formatted", "credo --strict --format=oneline"],
       quality: [
         "deps.get",
@@ -55,19 +44,8 @@ defmodule Argos.MixProject do
         "dialyzer",
         "cmd 'echo \"✅ quality terminado\"'"
       ],
-      ci: [
-        "deps.get",
-        "clean",
-        "compile --warnings-as-errors",
-        "cmd MIX_ENV=test mix test",
-        "credo --strict",
-        "cmd 'echo \\\"terminado terminado\"'"
-      ],
       hex_prepare: [
-        "clean",
-        "compile --force --warnings-as-errors",
-        "format",
-        "test",
+        "quality",
         "docs",
         "cmd mix hex.build"
       ],
@@ -90,11 +68,7 @@ defmodule Argos.MixProject do
     ]
   end
 
-  def escript do
-    [
-      main_module: Argos.CLI
-    ]
-  end
+  # escript function removed - Argos is now an internal library only
 
   defp description do
     "Librería base para ejecución de comandos del sistema y gestión de tareas asíncronas con resultados estructurados."

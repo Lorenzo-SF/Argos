@@ -1,5 +1,82 @@
 defmodule Argos.Command do
-  @moduledoc false
+  @moduledoc """
+  Sistema de ejecución de comandos shell con soporte para diferentes modos.
+
+  Proporciona macros y funciones para ejecutar comandos del sistema con control
+  granular sobre la salida, el modo de ejecución y el manejo de errores.
+
+  ## Características
+
+  - Múltiples modos de ejecución (normal, silencioso, interactivo, sudo)
+  - Resultados estructurados con duración y códigos de salida
+  - Logging automático de comandos ejecutados
+  - Soporte para timeouts configurables
+  - Manejo de procesos y señales
+  - Ejecución segura de comandos con validación
+
+  ## Modos de Ejecución
+
+  ### Normal (`exec!/2`)
+  Ejecuta un comando y devuelve un struct CommandResult con toda la información.
+
+      result = exec!("ls -la")
+      if result.success? do
+        IO.puts("Salida: #{result.output}")
+      end
+
+  ### Raw (`exec_raw!/2`)
+  Ejecuta un comando y devuelve una tupla {output, exit_code} sin logging.
+
+      {output, code} = exec_raw!("git status")
+
+  ### Silencioso (`exec_silent!/2`)
+  Ejecuta un comando redirigiendo toda la salida a /dev/null.
+
+      code = exec_silent!("some_quiet_command")
+
+  ### Interactivo (`exec_interactive!/2`)
+  Ejecuta un comando permitiendo interacción en tiempo real.
+
+      result = exec_interactive!("vim archivo.txt")
+
+  ### Sudo (`exec_sudo!/2`)
+  Ejecuta un comando con privilegios de superusuario.
+
+      result = exec_sudo!("systemctl restart nginx")
+
+  ## Opciones Comunes
+
+  - `:timeout` - Timeout en milisegundos (default: 30_000)
+  - `:stderr_to_stdout` - Redirige stderr a stdout (default: true)
+  - `:halt` - Termina el programa si el comando falla (default: false)
+  - `:interactive` - Modo interactivo para sudo (default: false)
+
+  ## Gestión de Procesos
+
+      # Matar procesos por nombre
+      Argos.Command.kill_process("my_app")
+
+      # Matar múltiples procesos
+      results = Argos.Command.kill_processes_by_name(["app1", "app2"])
+
+  ## Configuración
+
+  El shell usado por defecto se configura en config.exs:
+
+      config :argos, shell: "/bin/zsh"
+
+  ## Struct CommandResult
+
+  Todos los comandos (excepto raw) devuelven un %CommandResult{}:
+
+  - `command` - Comando ejecutado
+  - `args` - Argumentos del comando
+  - `output` - Salida capturada
+  - `exit_code` - Código de salida
+  - `duration` - Duración en milisegundos
+  - `success?` - true si exit_code == 0
+  - `error` - Mensaje de error si lo hay
+  """
 
   require Logger
 
@@ -206,12 +283,8 @@ defmodule Argos.Command do
 
   def __handle_halt__(result, _), do: result
 
-  defp __collect_output__(command, port, acc, caller, start_time) do
-    actual_start_time =
-      case start_time do
-        nil -> System.monotonic_time(:millisecond)
-        time -> time
-      end
+  defp __collect_output__(command, port, acc, caller, start_time) when is_integer(start_time) do
+    actual_start_time = start_time
 
     receive do
       {^port, {:data, data}} ->

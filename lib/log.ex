@@ -1,11 +1,51 @@
 defmodule Argos.Log do
   @moduledoc """
-  Logger customizado con soporte de colores ANSI, JSON pretty print y limpieza de ANSI.
+  Sistema de logging estructurado con soporte para modo TUI y standalone.
 
-  - Evita logs en producción.
-  - Limpia códigos ANSI.
-  - Muestra timestamp, nivel y origen.
-  - Pretty print de structs o mapas.
+  Proporciona logging con colores ANSI, limpieza automática de códigos de escape,
+  y manejo especial para modo interfaz de usuario (TUI).
+
+  ## Características
+
+  - Evita logs en entornos de producción
+  - Limpia códigos ANSI automáticamente
+  - Muestra timestamp, nivel y origen del log
+  - Pretty print de structs y mapas
+  - Detección automática de modo TUI
+  - Almacenamiento de logs para lectura asíncrona en TUI
+
+  ## Uso
+
+      # Logging simple
+      Argos.Log.log(:info, "Operación completada")
+
+      # Logging con metadata
+      Argos.Log.log(:info, "Tarea completada", task_id: 123, duration: 1500)
+
+      # Logging de comandos
+      Argos.Log.log_command_execution("ls -la", 0, 150, "total 8...")
+
+      # Logging de tareas
+      Argos.Log.log_task_execution("compile", true, 2500, "Success")
+
+  ## Niveles Soportados
+
+  - `:debug` - Información de depuración (cyan)
+  - `:info` - Información general (azul)
+  - `:notice` - Notificaciones (magenta)
+  - `:warn`, `:warning` - Advertencias (amarillo)
+  - `:success` - Operaciones exitosas (verde)
+  - `:error` - Errores (rojo)
+  - `:critical` - Errores críticos (rojo)
+  - `:emergency` - Emergencias (fondo rojo)
+
+  ## Configuración del Entorno
+
+  Define la variable `ARGOS_ENV` para controlar el comportamiento:
+
+  - `dev` - Logging completo (default)
+  - `test` - Logging completo
+  - `prod` - Sin logging
   """
 
   @behaviour :gen_event
