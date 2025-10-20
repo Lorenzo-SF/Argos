@@ -1,13 +1,80 @@
 defmodule Argos.AsyncTask do
   @moduledoc """
-  Sistema de ejecución de tareas asíncronas.
+  Provides asynchronous task execution capabilities with structured results.
+
+  This module allows you to run both single tasks and multiple tasks in parallel.
+  It includes features such as:
+  - Concurrency control
+  - Timeout handling
+  - Error management
+  - Structured result reporting
+  - Automatic logging of task execution
+
+  ## Features
+
+  - Execute tasks in parallel with configurable concurrency
+  - Support for both command-based and function-based tasks
+  - Automatic task result structuring
+  - Configurable timeouts and failure handling
+  - Integration with Argos logging system
+
+  ## Examples
+
+      # Run a single task
+      result = Argos.AsyncTask.run_single("my_task", fn -> "task completed" end)
+
+      # Run multiple tasks in parallel
+      tasks = [
+        {"compile", "mix compile"},
+        {"test", {:function, fn -> run_tests() end}},
+        {"lint", "mix credo --strict"}
+      ]
+      results = Argos.AsyncTask.run_parallel(tasks, max_concurrency: 2)
   """
 
   alias Argos.Command
   alias Argos.Structs.TaskResult
 
   @doc """
-  Ejecuta múltiples tareas en paralelo y devuelve resultados estructurados.
+  Executes multiple tasks in parallel and returns structured results.
+
+  This function runs a list of tasks concurrently, managing concurrency
+  and timeouts for optimal performance. Each task can be either a command
+  string or a function.
+
+  ## Parameters
+
+    * `tasks` - List of tasks, where each task is a tuple `{task_name, task_spec}`
+      - `task_name` - String or atom identifying the task
+      - `task_spec` - Either a command string or `{:function, function}` tuple
+    * `opts` - Keyword list of options
+      - `:timeout` - Maximum time to wait for each task in milliseconds (default: 300_000)
+      - `:max_concurrency` - Maximum number of concurrent tasks (default: number of schedulers)
+      - `:halt_on_failure` - Whether to halt the system if any task fails (default: false)
+
+  ## Returns
+
+    A map containing:
+    * `:results` - List of `Argos.Structs.TaskResult` structs
+    * `:total_duration` - Total execution time in milliseconds
+    * `:all_success?` - Boolean indicating if all tasks succeeded
+
+  ## Examples
+
+      # Execute multiple command tasks in parallel
+      tasks = [
+        {"compile", "mix compile"},
+        {"test", "mix test"},
+        {"format", "mix format"}
+      ]
+      results = Argos.AsyncTask.run_parallel(tasks, max_concurrency: 2)
+
+      # Execute function-based tasks in parallel
+      tasks = [
+        {"read_file", {:function, fn -> File.read!("config.txt") end}},
+        {"fetch_data", {:function, fn -> HTTPoison.get!("http://api.example.com") end}}
+      ]
+      results = Argos.AsyncTask.run_parallel(tasks)
   """
   def run_parallel(tasks, opts \\ []) when is_list(tasks) do
     timeout = Keyword.get(opts, :timeout, 300_000)
@@ -59,7 +126,37 @@ defmodule Argos.AsyncTask do
   end
 
   @doc """
-  Ejecuta una única tarea y devuelve su TaskResult.
+  Executes a single task and returns its TaskResult.
+
+  This function runs an individual task asynchronously with timeout protection
+  and proper error handling. The task can be either a command string or a function.
+
+  ## Parameters
+
+    * `task_name` - String or atom identifying the task
+    * `task_spec` - Task specification (command string or function)
+      - Command string: Executes the command via `Argos.Command.exec/2`
+      - Function: Executes the function directly
+    * `opts` - Keyword list of options
+      - `:timeout` - Maximum time to wait for the task in milliseconds (default: 30_000)
+
+  ## Returns
+
+    An `Argos.Structs.TaskResult` struct
+
+  ## Examples
+
+      # Execute a command task
+      result = Argos.AsyncTask.run_single("backup", "tar -czf backup.tar.gz /home/user/docs")
+
+      # Execute a function task
+      result = Argos.AsyncTask.run_single("data_processing", fn ->
+        # Some processing logic here
+        Enum.map(1..100, &(&1 * 2))
+      end)
+
+      # Execute with a custom timeout
+      result = Argos.AsyncTask.run_single("long_task", "sleep 10 && echo done", timeout: 15_000)
   """
   def run_single(task_name, task_spec, opts \\ []) do
     start_time = System.monotonic_time(:millisecond)

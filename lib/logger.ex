@@ -1,6 +1,31 @@
 defmodule Argos.Logger do
   @moduledoc """
-  Logger principal de Argos que implementa el backend de :logger.
+  Main Argos logger that implements the :logger backend behaviour.
+
+  This module provides a custom logger backend for the Erlang :logger application.
+  It acts as a bridge between the standard Elixir/OTP logging system and Argos's
+  configurable logging implementations.
+
+  The logger supports:
+  - Environment-based log level filtering
+  - Integration with custom logger implementations
+  - Metadata enrichment and filtering
+  - Timestamp formatting
+  - Message extraction and formatting
+
+  ## Configuration
+
+  The logger can be configured in your application configuration:
+
+      config :argos,
+        logger: MyCustomLogger,
+        env: :prod  # or :dev, :test
+
+  ## Examples
+
+      # This module is typically used as part of the :logger configuration
+      # and doesn't need to be called directly in most cases
+      :logger.add_handler(Argos.Logger, Argos.Logger, %{})
   """
 
   @behaviour :gen_event

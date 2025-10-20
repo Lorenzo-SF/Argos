@@ -1,8 +1,36 @@
 defmodule Argos.Logger.Default do
   @moduledoc """
-  Implementación por defecto del logger de Argos.
+  Default implementation of the Argos logger.
 
-  Proporciona logging con colores ANSI, formato estructurado y soporte para modo TUI.
+  This logger provides ANSI-colored output, structured formatting, and support for TUI mode.
+  It automatically detects if the application is running in TUI mode and adjusts output
+  accordingly - console output when in regular mode, and file-based logging when in TUI mode.
+
+  The default logger includes:
+  - Colored output based on log level
+  - Timestamps and caller information
+  - Structured metadata display
+  - TUI mode detection and handling
+  - Automatic message formatting
+
+  ## Features
+
+  - ANSI color-coded log levels for better readability
+  - Caller information (module, function) in log messages
+  - TUI mode support with file-based logging
+  - Structured metadata handling
+  - Automatic message formatting and ANSI code cleaning
+
+  ## Examples
+
+      # Configure as the default logger
+      config :argos,
+        logger: Argos.Logger.Default
+
+      # The logger will be used automatically by Argos functions
+      Argos.log(:info, "Application started")
+      result = Argos.Command.exec("ls -la")
+      Argos.log_command(result)
   """
 
   @behaviour Argos.Logger.Behaviour
