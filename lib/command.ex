@@ -71,9 +71,9 @@ defmodule Argos.Command do
 
       result = Argos.Command.exec("ls -la")
       if result.success? do
-        IO.puts("Command output: #{result.output}")
+        IO.puts("Command output: \#{result.output}")
       else
-        IO.puts("Command failed with exit code: #{result.exit_code}")
+        IO.puts("Command failed with exit code: \#{result.exit_code}")
       end
 
       # Execute with arguments as a list
@@ -557,7 +557,7 @@ defmodule Argos.Command do
       if result.success? do
         IO.puts("Nginx killed successfully")
       else
-        IO.puts("Failed to kill nginx: #{result.output}")
+        IO.puts("Failed to kill nginx: \#{result.output}")
       end
   """
   def kill_process(process_name) when is_binary(process_name) do
@@ -613,9 +613,9 @@ defmodule Argos.Command do
       results = Argos.Command.kill_processes_by_name(["nginx", "apache", "redis"])
       for {name, status} <- results do
         case status do
-          :killed -> IO.puts("#{name} was killed")
-          :not_found -> IO.puts("#{name} was not found")
-          {:error, reason} -> IO.puts("Error killing #{name}: #{reason}")
+          :killed -> IO.puts("\#{name} was killed")
+          :not_found -> IO.puts("\#{name} was not found")
+          {:error, reason} -> IO.puts("Error killing \#{name}: \#{reason}")
         end
       end
   """

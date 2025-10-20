@@ -31,10 +31,10 @@ defmodule Argos.MixProject do
 
   defp aliases do
     [
-      credo: ["format --check-formatted", "credo --strict --format=oneline"],
       quality: [
+        "format --check-formatted",
         "deps.get",
-        "credo",
+        "credo --strict --format=oneline",
         "compile --warnings-as-errors",
         "cmd 'echo \"✅ mix compile terminado\"'",
         "cmd MIX_ENV=test mix test",

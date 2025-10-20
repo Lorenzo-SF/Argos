@@ -55,13 +55,6 @@ defmodule Argos.Logger.DefaultTest do
       assert output =~ "success message"
       assert output =~ "[✓]"
     end
-
-    test "cleans ANSI codes from messages" do
-      # Este test debe verificar que clean_ansi funciona, no el output completo
-      cleaned = Argos.Logger.Default.__info__(:functions)
-      # El método clean_ansi es privado, probamos indirectamente
-      assert true
-    end
   end
 
   describe "log_command/1" do

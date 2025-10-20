@@ -47,13 +47,13 @@ defmodule Argos.Logger.Behaviour do
         @impl true
         def log(level, message, metadata) do
           timestamp = DateTime.utc_now() |> DateTime.to_iso8601()
-          IO.puts("[#{timestamp}] [#{level}] #{message} #{inspect(metadata)}")
+          IO.puts("[\#{timestamp}] [\#{level}] \#{message} \#{inspect(metadata)}")
           :ok
         end
 
         @impl true
         def log_command(%Argos.Structs.CommandResult{} = result) do
-          log(:info, "Command executed: #{result.command}", [
+          log(:info, "Command executed: \#{result.command}", [
             exit_code: result.exit_code,
             duration: result.duration
           ])
@@ -63,7 +63,7 @@ defmodule Argos.Logger.Behaviour do
         @impl true
         def log_task(%Argos.Structs.TaskResult{} = result) do
           status = if result.success?, do: "SUCCESS", else: "FAILED"
-          log(:info, "Task completed: #{result.task_name} - #{status}", [
+          log(:info, "Task completed: \#{result.task_name} - \#{status}", [
             duration: result.duration
           ])
           :ok
