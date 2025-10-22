@@ -5,7 +5,7 @@ defmodule Argos.MixProject do
     [
       app: :argos,
       version: "1.0.0",
-      elixir: "~> 1.18.4-otp-28",
+      elixir: "~> 1.18.2-otp-27",
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
@@ -32,7 +32,7 @@ defmodule Argos.MixProject do
   defp aliases do
     [
       quality: [
-        "format --check-formatted",
+        "format",
         "deps.get",
         "credo --strict --format=oneline",
         "compile --warnings-as-errors",
