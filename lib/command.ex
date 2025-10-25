@@ -8,29 +8,13 @@ defmodule Argos.Command do
 
   ## Features
 
-  - Execute commands with automatic logging
+  - Execute commands with minimal logging (errors only)
   - Support for raw, silent, interactive, and sudo command execution
   - Structured result handling with duration tracking
   - Automatic caller metadata collection
   - Timeout handling for long-running commands
   - Process management utilities
-
-  ## Examples
-
-      # Simple command execution
-      result = Argos.Command.exec("ls -la")
-
-      # Execute with options
-      result = Argos.Command.exec("git status", stderr_to_stdout: false)
-
-      # Raw execution without extra logging
-      {output, exit_code} = Argos.Command.exec_raw("pwd")
-
-      # Execute with sudo privileges
-      result = Argos.Command.exec_sudo("systemctl restart nginx")
-
-      # Silent execution (output redirected to /dev/null)
-      exit_code = Argos.Command.exec_silent("some_command")
+  - Error display in bottom half of terminal for TUI compatibility
   """
 
   alias Argos.Structs.CommandResult
@@ -42,9 +26,8 @@ defmodule Argos.Command do
   @doc """
   Executes a command and returns a structured CommandResult.
 
-  The command is executed through the system shell (default: `/bin/zsh`).
-  Results are automatically logged with metadata about the caller.
-  Execution duration is measured and included in the result.
+  Only errors are logged and displayed in the bottom half of the terminal
+  for better TUI integration.
 
   ## Parameters
 
@@ -55,29 +38,11 @@ defmodule Argos.Command do
 
     * `:stderr_to_stdout` - Redirect stderr to stdout (default: `true`)
     * `:halt` - Halt the system if the command fails with exit code other than 0 or 1 (default: `false`)
+    * `:silent` - Completely suppress all logging (default: `false`)
 
   ## Returns
 
-    An `Argos.Structs.CommandResult` struct containing:
-    * `command` - The executed command
-    * `args` - Command arguments
-    * `output` - Command output
-    * `exit_code` - Exit code (0 for success)
-    * `duration` - Execution time in milliseconds
-    * `success?` - Boolean indicating success (exit_code == 0)
-    * `error` - Error message if any
-
-  ## Examples
-
-      result = Argos.Command.exec("ls -la")
-      if result.success? do
-        IO.puts("Command output: \#{result.output}")
-      else
-        IO.puts("Command failed with exit code: \#{result.exit_code}")
-      end
-
-      # Execute with arguments as a list
-      result = Argos.Command.exec(["ls", "-la", "/tmp"])
+    An `Argos.Structs.CommandResult` struct
   """
   def exec(command, opts \\ []) do
     opts = Keyword.put_new(opts, :stderr_to_stdout, true)
@@ -86,25 +51,6 @@ defmodule Argos.Command do
 
   @doc """
   Executes a command and returns a tuple {output, exit_code} without additional logging.
-
-  This function provides a raw interface similar to `System.cmd/3` but with
-  the convenience of using the configured shell for string commands.
-
-  ## Parameters
-
-    * `command` - The command to execute as a string, or a list of [command | arguments]
-    * `opts` - Keyword list of options (see `System.cmd/3` for supported options)
-
-  ## Returns
-
-    A tuple `{output, exit_code}` where:
-    * `output` - The command output as a string
-    * `exit_code` - The command exit code (0 for success)
-
-  ## Examples
-
-      {output, 0} = Argos.Command.exec_raw("echo 'Hello, World!'")
-      {_, exit_code} = Argos.Command.exec_raw("ls /nonexistent/path")
   """
   def exec_raw(command, opts \\ []) do
     opts = Keyword.put_new(opts, :stderr_to_stdout, true)
@@ -113,28 +59,6 @@ defmodule Argos.Command do
 
   @doc """
   Executes a command redirecting output to /dev/null.
-
-  This function runs the command but suppresses all output. It returns only
-  the exit code of the command, useful for operations where you only care
-  about success/failure.
-
-  ## Parameters
-
-    * `command` - The command to execute as a string
-    * `opts` - Keyword list of options (see `System.cmd/3` for supported options)
-
-  ## Returns
-
-    The exit code of the command execution (0 for success)
-
-  ## Examples
-
-      exit_code = Argos.Command.exec_silent("touch /tmp/myfile")
-      if exit_code == 0 do
-        IO.puts("File created successfully")
-      else
-        IO.puts("Failed to create file")
-      end
   """
   def exec_silent(command, opts \\ []) do
     opts = Keyword.put_new(opts, :stderr_to_stdout, true)
@@ -143,30 +67,6 @@ defmodule Argos.Command do
 
   @doc """
   Executes a command in interactive mode.
-
-  This function is designed for commands that require user interaction,
-  such as editors, interactive shells, or commands that need user input.
-  It attempts to use the `script` utility if available for better
-  interactive handling.
-
-  ## Parameters
-
-    * `command` - The command to execute as a string
-    * `opts` - Keyword list of options
-
-  ## Options
-
-    * `:interactive` - Set to true to enable interactive mode (default: `true`)
-    * `:halt` - Halt the system if the command fails (default: `false`)
-
-  ## Returns
-
-    An `Argos.Structs.CommandResult` struct
-
-  ## Examples
-
-      result = Argos.Command.exec_interactive("vim /tmp/file.txt")
-      result = Argos.Command.exec_interactive("python -c \"input('Press enter: ')\"")
   """
   def exec_interactive(command, opts \\ []) do
     opts = Keyword.put_new(opts, :interactive, true)
@@ -175,29 +75,6 @@ defmodule Argos.Command do
 
   @doc """
   Executes a command with superuser privileges using sudo.
-
-  This function logs a warning when sudo execution is attempted for security awareness.
-  It handles sudo execution with proper argument formatting and environment setup.
-
-  ## Parameters
-
-    * `command` - The command to execute as a string
-    * `opts` - Keyword list of options
-
-  ## Options
-
-    * `:interactive` - Enable interactive mode for sudo (default: `false`)
-    * `:stderr_to_stdout` - Redirect stderr to stdout (default: `true`)
-    * `:halt` - Halt the system if the command fails (default: `false`)
-
-  ## Returns
-
-    An `Argos.Structs.CommandResult` struct
-
-  ## Examples
-
-      result = Argos.Command.exec_sudo("systemctl restart nginx")
-      result = Argos.Command.exec_sudo("apt-get update", interactive: true)
   """
   def exec_sudo(command, opts \\ []) do
     opts = Keyword.put_new(opts, :stderr_to_stdout, true)
@@ -221,6 +98,8 @@ defmodule Argos.Command do
 
   def __exec__(:normal, command, opts) do
     {halt?, opts} = Keyword.pop(opts, :halt, false)
+    {silent?, opts} = Keyword.pop(opts, :silent, false)
+
     start_time = System.monotonic_time(:millisecond)
 
     {output, exit_code} = __exec__(:raw, command, opts)
@@ -236,20 +115,23 @@ defmodule Argos.Command do
       error: nil
     }
 
-    # Log automático con metadata del caller
-    __log_result__(command, result, get_caller_metadata())
+    # Solo loguear errores, no éxitos
+    unless silent? do
+      __log_result__(command, result, get_caller_metadata())
+    end
 
     __handle_halt__(result, halt?)
     result
   end
 
   def __exec__(:silent, command, opts) do
-    result = __exec__(:normal, "#{command} > /dev/null 2>&1", opts)
+    result = __exec__(:normal, "#{command} > /dev/null 2>&1", Keyword.put(opts, :silent, true))
     result.exit_code
   end
 
   def __exec__(:interactive, command, opts) do
     halt? = Keyword.get(opts, :halt, false)
+    silent? = Keyword.get(opts, :silent, false)
     start_time = System.monotonic_time(:millisecond)
 
     case System.find_executable("script") do
@@ -262,7 +144,7 @@ defmodule Argos.Command do
             :stderr_to_stdout
           ])
 
-        result = __collect_output__(command, port, "", start_time)
+        result = __collect_output__(command, port, "", start_time, silent?)
         __handle_halt__(result, halt?)
 
       script_path ->
@@ -278,7 +160,7 @@ defmodule Argos.Command do
           ])
 
         command
-        |> __collect_output__(port, "", start_time)
+        |> __collect_output__(port, "", start_time, silent?)
         |> __handle_halt__(halt?)
     end
   end
@@ -286,9 +168,12 @@ defmodule Argos.Command do
   def __exec__(:sudo, command, opts) do
     interactive? = Keyword.get(opts, :interactive, false)
     halt? = Keyword.get(opts, :halt, false)
+    silent? = Keyword.get(opts, :silent, false)
     start_time = System.monotonic_time(:millisecond)
 
-    Argos.log(:warning, "SUDO command execution attempted", command: command)
+    unless silent? do
+      Argos.log(:warning, "SUDO command execution attempted", command: command)
+    end
 
     executable = System.find_executable("sudo")
 
@@ -306,12 +191,12 @@ defmodule Argos.Command do
         ])
 
       command
-      |> __collect_output__(port, "", start_time)
+      |> __collect_output__(port, "", start_time, silent?)
       |> __handle_halt__(halt?)
     else
       duration = System.monotonic_time(:millisecond) - start_time
 
-      %CommandResult{
+      result = %CommandResult{
         command: command,
         args: [],
         output: "sudo command not found",
@@ -320,6 +205,12 @@ defmodule Argos.Command do
         success?: false,
         error: "sudo command not found"
       }
+
+      unless silent? do
+        __log_result__(command, result, get_caller_metadata())
+      end
+
+      result
     end
   end
 
@@ -361,26 +252,73 @@ defmodule Argos.Command do
     end
   end
 
-  # ---------------- HELPER: LOGGING MEJORADO ----------------
+  # ---------------- LOGGING MEJORADO: SOLO ERRORES EN MITAD INFERIOR ----------------
+  defp __log_result__(command, %CommandResult{success?: true} = _result, _caller_metadata) do
+    # No loguear comandos exitosos - completamente silencioso
+    :ok
+  end
+
   defp __log_result__(command, %CommandResult{} = result, caller_metadata) do
-    # Usar la nueva API de logging de Argos
+    # Solo loguear errores y posicionarlos en la mitad inferior de la terminal
+    {term_rows, _} = get_terminal_size()
+    error_row = div(term_rows, 2) + 1
+
     metadata =
       [
         command: command,
         exit_code: result.exit_code,
         duration: result.duration,
         success?: result.success?,
-        output_length: String.length(result.output || "")
+        output_length: String.length(result.output || ""),
+        position: error_row
       ] ++ Map.to_list(caller_metadata)
 
-    if result.success? do
-      Argos.log(:info, "Command executed: #{command}", metadata)
-    else
-      Argos.log(:error, "Command failed: #{command}", metadata)
-    end
+    # Usar logging especial para TUI que posiciona en la mitad inferior
+    __log_error_tui__(command, result, metadata)
+  end
 
-    # También loguear el resultado estructurado
-    Argos.log_command(result)
+  defp __log_error_tui__(command, result, metadata) do
+    {term_cols, term_rows} = get_terminal_size()
+    error_row = div(term_rows, 2) + 1
+
+    # Limpiar la línea donde vamos a mostrar el error
+    IO.write("\e[#{error_row};1H\e[2K")
+
+    # Mostrar el error formateado
+    error_msg =
+      "Command failed: #{command} (exit: #{result.exit_code}, duration: #{result.duration}ms)"
+
+    # Truncar si es muy largo para que quepa en la terminal
+    max_length = term_cols - 10
+
+    display_msg =
+      if String.length(error_msg) > max_length do
+        String.slice(error_msg, 0, max_length) <> "..."
+      else
+        error_msg
+      end
+
+    # Escribir en rojo en la posición calculada
+    IO.write("\e[#{error_row};1H\e[31m#{display_msg}\e[0m")
+
+    # También loguear internamente para debugging
+    Argos.log(:error, "Command failed: #{command}", Keyword.drop(metadata, [:position]))
+  end
+
+  defp get_terminal_size do
+    cols =
+      case :io.columns() do
+        {:ok, c} -> c
+        _ -> 80
+      end
+
+    rows =
+      case :io.rows() do
+        {:ok, r} -> r
+        _ -> 24
+      end
+
+    {rows, cols}
   end
 
   # ---------------- MANTENER FUNCIONES EXISTENTES (modificadas) ----------------
@@ -406,21 +344,6 @@ defmodule Argos.Command do
 
   @doc """
   Halts the system with the specified exit code.
-
-  This function terminates the Erlang VM and does not return.
-  Use with caution as this will stop the entire application.
-
-  ## Parameters
-
-    * `code` - The exit code to use (default: 0 for success)
-
-  ## Examples
-
-      # Exit with success code
-      Argos.Command.halt()
-
-      # Exit with error code
-      Argos.Command.halt(1)
   """
   @dialyzer {:no_return, halt: 0}
   @dialyzer {:no_return, halt: 1}
@@ -430,6 +353,7 @@ defmodule Argos.Command do
 
   def __handle_halt__(%CommandResult{exit_code: code, output: msg}, true)
       when code not in [0, 1] do
+    # Para halt, mostrar el error en la posición normal (no TUI)
     Argos.log(:error, "Command failed, halting system",
       exit_code: code,
       output: String.trim(msg || "")
@@ -440,12 +364,12 @@ defmodule Argos.Command do
 
   def __handle_halt__(result, _), do: result
 
-  defp __collect_output__(command, port, acc, start_time) when is_integer(start_time) do
+  defp __collect_output__(command, port, acc, start_time, silent?) when is_integer(start_time) do
     actual_start_time = start_time
 
     receive do
       {^port, {:data, data}} ->
-        __collect_output__(command, port, acc <> data, actual_start_time)
+        __collect_output__(command, port, acc <> data, actual_start_time, silent?)
 
       {^port, {:exit_status, code}} ->
         duration = System.monotonic_time(:millisecond) - actual_start_time
@@ -460,7 +384,10 @@ defmodule Argos.Command do
           error: nil
         }
 
-        __log_result__(command, result, get_caller_metadata())
+        unless silent? do
+          __log_result__(command, result, get_caller_metadata())
+        end
+
         result
     after
       @shell_timeout ->
@@ -476,7 +403,10 @@ defmodule Argos.Command do
           error: "Timeout after #{@shell_timeout}ms"
         }
 
-        __log_result__(command, result, get_caller_metadata())
+        unless silent? do
+          __log_result__(command, result, get_caller_metadata())
+        end
+
         result
     end
   end
@@ -484,29 +414,6 @@ defmodule Argos.Command do
   # ---------------- MANTENER FUNCIONES DE PROCESOS ----------------
   @doc """
   Processes a command response code into a structured format.
-
-  This function takes an exit code and returns a map with code, message, and type
-  based on the exit code value.
-
-  ## Parameters
-
-    * `code` - The exit code to process
-    * `opts` - Keyword list of options for custom messages
-      * `:success_message` - Message for exit code 0 (default: "")
-      * `:warning_message` - Message for exit code 1 (default: "")
-      * `:error_message` - Message for other codes (default: "")
-
-  ## Returns
-
-    A map with:
-    * `:code` - The original exit code
-    * `:message` - Normalized message as a list of lines
-    * `:type` - The message type (:success, :warning, or :error)
-
-  ## Examples
-
-      response = Argos.Command.process_response(0, success_message: "Operation completed")
-      # Returns: %{code: 0, message: ["Operation completed"], type: :success}
   """
   def process_response(code, opts \\ []) do
     message =
@@ -539,32 +446,12 @@ defmodule Argos.Command do
   # ---------------- FUNCIONES DE KILL CORREGIDAS ----------------
   @doc """
   Kills a process by name using the kill command.
-
-  This function uses pgrep to find processes matching the name and kills them
-  with SIGTERM. Includes safety checks to prevent command injection.
-
-  ## Parameters
-
-    * `process_name` - The name of the process to kill (string)
-
-  ## Returns
-
-    An `Argos.Structs.CommandResult` struct
-
-  ## Examples
-
-      result = Argos.Command.kill_process("nginx")
-      if result.success? do
-        IO.puts("Nginx killed successfully")
-      else
-        IO.puts("Failed to kill nginx: \#{result.output}")
-      end
   """
   def kill_process(process_name) when is_binary(process_name) do
     if String.length(process_name) > 0 and
          String.match?(process_name, ~r/^[a-zA-Z0-9_.-]+$/) do
-      # Usar exec en lugar de exec_raw para evitar problemas
-      exec("pgrep -f #{process_name} | head -10 | xargs kill -TERM")
+      # Usar exec en modo silencioso
+      exec("pgrep -f #{process_name} | head -10 | xargs kill -TERM", silent: true)
     else
       %CommandResult{
         command: "kill",
@@ -591,36 +478,10 @@ defmodule Argos.Command do
 
   @doc """
   Kills multiple processes by name using a more robust approach.
-
-  This function attempts to gracefully kill processes first with SIGTERM,
-  then forcefully with SIGKILL if needed. It logs the operation and
-  returns detailed results for each process.
-
-  ## Parameters
-
-    * `process_names` - List of process names to kill
-
-  ## Returns
-
-    A list of tuples where each tuple contains `{process_name, status}`.
-    Status can be:
-    * `:killed` - Process was successfully killed
-    * `:not_found` - Process was not found
-    * `{:error, reason}` - Error occurred while killing process
-
-  ## Examples
-
-      results = Argos.Command.kill_processes_by_name(["nginx", "apache", "redis"])
-      for {name, status} <- results do
-        case status do
-          :killed -> IO.puts("\#{name} was killed")
-          :not_found -> IO.puts("\#{name} was not found")
-          {:error, reason} -> IO.puts("Error killing \#{name}: \#{reason}")
-        end
-      end
   """
   def kill_processes_by_name(process_names) when is_list(process_names) do
-    Argos.log(:info, "Killing processes", process_names: process_names)
+    # Log silencioso para TUI
+    Argos.log(:info, "Killing processes", process_names: process_names, silent: true)
 
     Enum.map(process_names, fn process_name ->
       case kill_process_robust(process_name) do
@@ -643,10 +504,12 @@ defmodule Argos.Command do
         :not_found
 
       {:kill_term, %CommandResult{output: error, exit_code: code}} ->
+        # Log de error silencioso
         Argos.log(:error, "Error killing process",
           process_name: process_name,
           error: error,
-          exit_code: code
+          exit_code: code,
+          silent: true
         )
 
         {:error, :kill_term_command_failed}
@@ -657,7 +520,6 @@ defmodule Argos.Command do
   end
 
   defp do_kill_term(process_name) do
-    # Usar System.cmd directamente sin opciones problemáticas
     {output, exit_code} = System.cmd("pkill", ["-TERM", process_name])
 
     {:kill_term,
